@@ -104,6 +104,7 @@ button.x{padding:2px 10px;font-size:17px;line-height:1.2}
 <button id="sv" type="button">Save PNG</button>
 <button id="cp" type="button">Copy</button>
 <button id="rc" type="button" hidden>Record spin</button>
+<button id="rs" type="button" hidden>Record shimmer loop</button>
 <span class="note" id="svm" role="status"></span>
 </div>
 </div>
@@ -534,10 +535,10 @@ invalidate()}
 function setMode(m){G.mode=m;if(!G.ready||!G.L)return;G.g.rotation.set(0,0,0);bgSet();applyMat();buildMeshes()}
 
 /* ---------- render loop ---------- */
-function frame(now){requestAnimationFrame(frame);if(!G.ready||!G.L)return;var d3=G.mode==='3d',anim=S.shimmer||(d3&&S.spin&&!G.drag)||G.rec,dt=Math.min(64,now-(G.tl||now));G.tl=now;if(!G.dirty&&!anim)return;G.dirty=0;
+function frame(now){requestAnimationFrame(frame);if(!G.ready||!G.L)return;var d3=G.mode==='3d',anim=S.shimmer||G.srec||(d3&&S.spin&&!G.drag)||G.rec,dt=Math.min(64,now-(G.tl||now));G.tl=now;if(!G.dirty&&!anim)return;G.dirty=0;
 if(G.rec)G.yaw=G.rec.y0+Math.PI*2*Math.min(1,(now-G.rec.t0)/G.rec.T);else if(d3&&S.spin&&!G.drag)G.yaw+=.00072*dt;
-if(S.shimmer){var t=(now-G.t0)/1000;G.shim=.5*Math.sin(t*.7);G.shimT=.22*Math.sin(t*.5+1);envMat(S.envrot/100*Math.PI*2+G.shim,S.envtilt/100*Math.PI*.5+G.shimT)}
-else if(G.shim){G.shim=0;G.shimT=0;envMat(S.envrot/100*Math.PI*2,S.envtilt/100*Math.PI*.5)}
+if(S.shimmer||G.srec){var SP=6000,ph=G.srec?Math.min(1,(now-G.srec.t0)/G.srec.T):(now%SP)/SP,TP=Math.PI*2;G.shim=.5*Math.sin(TP*ph);G.shimT=.22*Math.sin(TP*2*ph+1);envMat(S.envrot/100*Math.PI*2+G.shim,S.envtilt/100*Math.PI*.5+G.shimT)}
+else if(G.shim||G.shimT){G.shim=0;G.shimT=0;envMat(S.envrot/100*Math.PI*2,S.envtilt/100*Math.PI*.5)}
 if(d3){G.g.rotation.y=G.yaw;G.g.rotation.x=G.pitch}else G.g.rotation.set(0,0,0);
 updFl();G.r.render(G.s,G.cam)}
 
@@ -623,7 +624,7 @@ var SPEC_L=[
 ['Spiked ornaments',1,[Sl('orn','Ornament',OPT.orn,'L',{w:2}),R('sk','Spike length',30,150,'L',{w:2})]],
 ['Image import',0,[Hh(IMP)]]];
 var SPEC_R=[
-['Metal & light',1,[Sl('metal','Metal',OPT.metal,'E'),Sl('env','Reflections',ENV_NAMES,'E'),R('envrot','Rotate light',0,100,'M',{f:DEG(3.6)}),R('envtilt','Tilt light',-50,50,'M',{f:DEG(.9)}),R('expo','Exposure',40,200,'M'),R('contrast','Contrast',60,160,'M'),R('rimlight','Rim glow',0,100,'M'),R('contour','Edge line',0,100,'M'),R('glow','Glow',0,100,'M'),Hh('<label class="w2">Tint<span class="row"><input type="color" id="tintc" value="#ffffff" style="flex:1"><button type="button" id="tintr">Reset</button></span></label>'),R('irid','Iridescence',0,100,'E',{w:2}),Ck('shimmer','Shimmer (animate the light)','V',{w:2})]],
+['Metal & light',1,[Sl('metal','Metal',OPT.metal,'E'),Sl('env','Reflections',ENV_NAMES,'E'),R('envrot','Rotate light',0,100,'M',{f:DEG(3.6)}),R('envtilt','Tilt light',-50,50,'M',{f:DEG(.9)}),R('expo','Exposure',40,200,'M'),R('contrast','Contrast',60,160,'M'),R('rimlight','Rim glow',0,100,'M'),R('contour','Edge line',0,100,'M'),R('glow','Glow',0,100,'M'),Hh('<label class="w2">Tint<span class="row"><input type="color" id="tintc" value="#ffffff" style="flex:1"><button type="button" id="tintr">Reset</button></span></label>'),R('irid','Iridescence',0,100,'E',{w:2}),Ck('shimmer','Shimmer (looping light, 6 s)','V',{w:2})]],
 ['Shape',1,[Sl('prof','Bevel profile',OPT.prof,'S',{w:2}),R('puff','Puffiness',10,100,'S'),R('rim','Rim width',0,60,'S'),R('smooth','Liquid smoothing',0,60,'F'),R('sweepx','Sweep across',-100,100,'M'),R('sweepy','Sweep down',-100,100,'M')]],
 ['Surface',0,[R('rough','Roughness',0,100,'R',{w:2}),Sl('tex','Texture',OPT.tex,'B',{w:2})]],
 ['Lens flare',1,[Sl('fl','Type',OPT.fl,'X',{w:2}),R('fst','Strength',20,100,'X'),R('fc','Count',1,8,'X'),Hh('<button class="w2" id="shuf" type="button">Shuffle positions</button>'),R('bsp','Border sparkles (per window)',0,6,'-',{w:2})]],
@@ -679,7 +680,7 @@ if(k.G)bgSet();
 invalidate();saveSoon()}
 var svT=0;function saveSoon(){clearTimeout(svT);svT=setTimeout(function(){try{localStorage.setItem('lcx18',JSON.stringify(S))}catch(e){}},400)}
 function loadS(){try{var o=JSON.parse(localStorage.getItem('lcx18')||'null');if(o&&typeof o==='object')for(var k in DEF)if(k in o&&typeof o[k]===typeof DEF[k])S[k]=o[k]}catch(e){}}
-function modeUI(){var d3=S.mode==='3d';$('md').value=S.mode;$('spinw').hidden=!d3;$('rc').hidden=!(d3&&window.MediaRecorder&&HTMLCanvasElement.prototype.captureStream);
+function modeUI(){var d3=S.mode==='3d';$('md').value=S.mode;$('spinw').hidden=!d3;$('rc').hidden=!(d3&&window.MediaRecorder&&HTMLCanvasElement.prototype.captureStream);$('rs').hidden=!(window.MediaRecorder&&HTMLCanvasElement.prototype.captureStream);
 $('hint').textContent=d3?'Drag to rotate, scroll to zoom, Shift-drag to move the light.':'Scroll to zoom, drag to pan, Shift-drag to move the light.'}
 
 /* ---------- image import ---------- */
@@ -714,6 +715,25 @@ if(copy){await navigator.clipboard.write([new ClipboardItem({'image/png':b})]);n
 else{await saveBlob(b,(G.mode==='3d'?'chrome-3d':'chrome-type')+'.png');note('Saved.')}}
 catch(e){note(e&&e.code==='declined'?'':(copy?'Copy is blocked here. Use Save PNG.':'Could not save the image.'))}
 finally{G.busy=0;$('sv').disabled=$('cp').disabled=false;if(G.rbWait){G.rbWait=0;rebuild()}}}
+async function recordShimmer(){if(G.rec||G.srec||G.busy||!G.L)return;G.busy=1;
+var c=$('c3'),mt=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].filter(function(t){return MediaRecorder.isTypeSupported(t)})[0];
+if(!mt){note('Recording is not supported in this browser.');G.busy=0;return}
+var L=G.L,v=viewSize(),d3=G.mode==='3d',oldKey=G.szKey,hiRes=0;
+if(!d3){hiRes=Math.max(Math.min(2,window.devicePixelRatio||1),Math.min(3,Math.sqrt(6e6/(v.w*v.h))));G.r.setPixelRatio(hiRes);G.szKey='';invalidate()}
+await new Promise(function(r){requestAnimationFrame(function(){requestAnimationFrame(r)})});
+var pr=c.width/v.w,sx=0,sy=0,sw=c.width,sh=c.height;
+if(!d3){var z=Math.min(v.w/L.W,v.h/L.H)*.94*G.z2,cx=v.w/2-G.px*L.W*z,cy=v.h/2+G.py*L.H*z,x0=Math.max(0,cx-L.W*z/2),y0=Math.max(0,cy-L.H*z/2),x1=Math.min(v.w,cx+L.W*z/2),y1=Math.min(v.h,cy+L.H*z/2);
+if(x1-x0>8&&y1-y0>8){sx=x0*pr;sy=y0*pr;sw=(x1-x0)*pr;sh=(y1-y0)*pr}}
+var k=Math.min(1,1600/Math.max(sw,sh)),o=document.createElement('canvas');o.width=Math.max(2,Math.round(sw*k)&~1);o.height=Math.max(2,Math.round(sh*k)&~1);
+var x=o.getContext('2d'),on=1,chunks=[];
+function cp(){if(!on)return;x.fillStyle=S.bg==='none'?'#000':S.bg;x.fillRect(0,0,o.width,o.height);x.drawImage(c,sx,sy,sw,sh,0,0,o.width,o.height);requestAnimationFrame(cp)}
+var rec=new MediaRecorder(o.captureStream(30),{mimeType:mt,videoBitsPerSecond:10e6});rec.ondataavailable=function(e){if(e.data&&e.data.size)chunks.push(e.data)};
+var done=new Promise(function(r){rec.onstop=r});$('rs').disabled=true;note('Recording one seamless 6 s loop…',9000);
+G.srec={t0:performance.now(),T:6000};invalidate();cp();rec.start();
+await new Promise(function(r){setTimeout(r,6150)});rec.stop();await done;on=0;G.srec=null;$('rs').disabled=false;G.busy=0;
+if(!d3){G.szKey='';fitCam()}invalidate();
+try{await saveBlob(new Blob(chunks,{type:'video/webm'}),'chrome-shimmer-loop.webm');note('Saved. It loops seamlessly.')}catch(e){note(e&&e.code==='declined'?'':'Could not save the video.')}
+if(G.rbWait){G.rbWait=0;rebuild()}}
 async function recordSpin(){if(G.mode!=='3d'||G.rec||G.busy)return;G.busy=1;
 var c=$('c3'),mt=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].filter(function(t){return MediaRecorder.isTypeSupported(t)})[0];
 if(!mt){note('Recording is not supported in this browser.');G.busy=0;return}
@@ -789,7 +809,7 @@ $('clr').addEventListener('click',function(){IMG=null;$('im').value='';msg('Blac
 $('rv').addEventListener('click',function(){resetView()});
 $('sv').addEventListener('click',function(){doExport(0)});
 $('cp').addEventListener('click',function(){doExport(1)});
-$('rc').addEventListener('click',recordSpin);
+$('rc').addEventListener('click',recordSpin);$('rs').addEventListener('click',recordShimmer);
 ['dragenter','dragover'].forEach(function(ev){document.addEventListener(ev,function(e){var ty=e.dataTransfer&&e.dataTransfer.types;if(ty&&Array.prototype.indexOf.call(ty,'Files')>=0){e.preventDefault();$('view').classList.add('drop')}})});
 document.addEventListener('dragleave',function(e){if(!e.relatedTarget)$('view').classList.remove('drop')});
 document.addEventListener('drop',function(e){e.preventDefault();$('view').classList.remove('drop');var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)importFile(f)});
@@ -810,5 +830,7 @@ rebuild();
 </script>
 </body>
 </html>
+
+</body></html>
 
 </body></html>
